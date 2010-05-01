@@ -1,7 +1,7 @@
 from distutils.core import setup
 
 setup(name='bitfile',
-      version='0.1',
+      version='0.2',
       description=\
         'Module for reading/writing an arbitrary number of bits from a file.',
       author='Michael Dipperstein',
