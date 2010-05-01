@@ -119,8 +119,8 @@ class BitFile:
     Instance Variables:
         _stream - A pointer to the file stream.
         _mode - The mode of the file stream (read, write, append, ...)
-        _bit_buffer - A buffer for aggregating bits into bytes.
-        _bit_count - The number of bits currently in the buffer.
+        _input_buffer - A buffer for storing unread from bytes.
+        _output_buffer - A buffer for aggregating bits written into bytes.
 
     """
 
@@ -140,8 +140,8 @@ class BitFile:
             Data elements are initialized as follows:
             _stream = None
             _mode = ''
-            _bit_buffer = 0
-            _bit_count = 0
+            _input_buffer = [0, 0]
+            _output_buffer = [0, 0]
 
         Exceptions Raised:
             None.
@@ -150,8 +150,10 @@ class BitFile:
 
         self._stream = None
         self._mode = ''
-        self._bit_buffer = 0
-        self._bit_count = 0
+
+        # buffers are in the format [bit_count, buffered_bits]
+        self._input_buffer = [0, 0]
+        self._output_buffer = [0, 0]
         return
 
     def __del__(self):
@@ -202,6 +204,57 @@ class BitFile:
             raise ValueError('I/O operation on closed file.')
         return
 
+    def _is_readable(self):
+        """Returns True if there if the current steam can be read.
+
+        This method will return True if there is a stream that is opened
+        and readable (mode = 'rb' or 'r+b').
+
+        Arguments:
+            None.
+
+        Return Value(s):
+            None.
+
+        Side Effects:
+            None.
+
+        Exceptions Raised:
+            None.
+
+        """
+
+        if self._stream is not None and 'r' in self._mode:
+            return True
+        else:
+            return False
+
+    def _is_writable(self):
+        """Returns True if there if the current steam can be read.
+
+        This method will return True if there is a stream that is opened
+        and writable (mode = 'wb' or 'ab' or 'r+b').
+
+        Arguments:
+            None.
+
+        Return Value(s):
+            None.
+
+        Side Effects:
+            None.
+
+        Exceptions Raised:
+            None.
+
+        """
+
+        if self._stream is not None and\
+            any(['w' in self._mode, 'a' in self._mode, '+' in self._mode]):
+            return True
+        else:
+            return False
+
     def open(self, file_name, mode):
         """Open a BitFile stream.
 
@@ -227,20 +280,18 @@ class BitFile:
         """
 
         if self._stream is None or self._stream.closed:
-            if 'w' in mode and 'r' in mode:
-                raise ValueError(
-                    "mode string with both'r' and 'w' not supported.")
-
             if 't' in mode or 'U' in mode:
                 raise ValueError('text mode not supported.')
 
             if 'b' not in mode:
                 # Force binary mode in case this we're using ms windows.
                 mode = mode + 'b'
+
+            # open function will throw exception for other invalid modes.
             self._stream = open(file_name, mode)
             self._mode = mode
-            self._bit_buffer = 0
-            self._bit_count = 0
+            self._input_buffer = [0, 0]
+            self._output_buffer = [0, 0]
         else:
             raise ValueError('I/O operation on opened file.')
         return
@@ -261,7 +312,8 @@ class BitFile:
 
         Side Effects:
             _stream will be set to None.
-            _bit_buffer and _bit_count will be set to zero.
+            _mode will be cleared.
+            _output_buffer will be zeroed.
 
         Exceptions Raised:
             ValueError - Raised if the stream is already closed.
@@ -270,15 +322,15 @@ class BitFile:
 
         self._verify_opened()
 
-        if ('w' in self._mode or 'a' in self._mode) and self._bit_count != 0:
-            # Writable file with buffered bits.  Flush bit_buffer.
+        if self._is_writable() and self._output_buffer[0] != 0:
+            # Writable file with buffered bits.  Flush output_buffer.
             self.flush(False)
 
         self._stream.close()
         self._stream = None
         self._mode = ''
-        self._bit_buffer = 0
-        self._bit_count = 0
+        self._input_buffer = [0, 0]
+        self._output_buffer = [0, 0]
         return
 
     def byte_align(self):
@@ -297,7 +349,7 @@ class BitFile:
 
         Side Effects:
             Any buffered bits will be written to an output stream.
-            _bit_buffer and _bit_count will be set to zero.
+            All buffers will be zeroed.
 
         Exceptions Raised:
             ValueError - Raised if the stream is not opened.
@@ -306,17 +358,46 @@ class BitFile:
 
         self._verify_opened()
 
-        return_value = self._bit_buffer
+        return_value = self._output_buffer[1]
 
-        if ('w' in self._mode or 'a' in self._mode) and self._bit_count != 0:
+        if self._is_writable() and self._output_buffer[0] != 0:
             # Write out any unwritten bits.
-            self._bit_buffer = self._bit_buffer << (8 - self._bit_count)
-            self._stream.write(chr(self._bit_buffer))
+            bits = self._output_buffer[1] << (8 - self._output_buffer[0])
+            self._stream.write(chr(bits))
 
-        self._bit_buffer = 0
-        self._bit_count = 0
-
+        self._input_buffer = [0, 0]
+        self._output_buffer = [0, 0]
         return return_value
+
+    def seek(self, offset, whence=0):
+        """Seeks to the specified position in a BitFile stream.
+
+        This method exposes Python's seek method for file objects.
+        Since seek offsets are specified in terms of bytes, the BitFile
+        stream will be byte aligned prior to the seek.
+
+        Arguments:
+            offset - The number of bytes to seek from whence position.
+            whence - The position that offset is referenced from.
+                     os.SEEK_SET (0) - absolute file positioning.
+                     os.SEEK_CUR (1) - relative to the current position.
+                     os.SEEK_END (2) - relative to the end of file.
+
+        Return Value(s):
+            None.
+
+        Side Effects:
+            Any buffered bits will be written to an output stream.
+            _output_buffer will be zeroed.
+            The current file position will be set to the seek location.
+
+        Exceptions Raised:
+            ValueError - Raised if the stream is not opened.
+            Other exceptions may be raised by the seek function.
+
+        """
+        self.byte_align()
+        self._stream.seek(offset, whence)
 
     def flush(self, ones_fill=False):
         """Flushes the bit buffer of an output stream.
@@ -335,7 +416,7 @@ class BitFile:
 
         Side Effects:
             Any buffered bits will be written to an output stream.
-            _bit_buffer and _bit_count will be set to zero.
+            _output_buffer will be zeroed.
 
         Exceptions Raised:
             ValueError - Raised if the stream is not opened.
@@ -345,24 +426,23 @@ class BitFile:
 
         self._verify_opened()
 
-        if 'w' not in self._mode and 'a' not in self._mode:
+        if not self._is_writable():
             raise IOError(errno.EBADF, 'Bad file descriptor')
 
-        if self._bit_count == 0:
+        if self._output_buffer[0] == 0:
             return 0
 
         # There must be unwritten bits.  Write them out.
-        return_value = self._bit_count
-        self._bit_buffer = self._bit_buffer << (8 - self._bit_count)
-        self._bit_buffer = self._bit_buffer & 0xFF
+        return_value = self._output_buffer[0]
+        bits = self._output_buffer[1] << (8 - self._output_buffer[0])
+        bits = bits & 0xFF
 
         if ones_fill:
-            self._bit_buffer = self._bit_buffer | (0xFF >> self._bit_count)
+            bits = bits | (0xFF >> self._output_buffer[0])
 
-        self._stream.write(chr(self._bit_buffer))
+        self._stream.write(chr(bits))
         self._stream.flush()
-        self._bit_buffer = 0
-        self._bit_count = 0
+        self._output_buffer = [0, 0]
 
         return return_value
 
@@ -379,11 +459,11 @@ class BitFile:
 
         Side Effects:
             One byte is read from the input stream.
-            _bit_buffer and _bit_count are updated appropriately.
+            _input_buffer is updated appropriately.
 
         Exceptions Raised:
             ValueError - Raised if the stream is not opened.
-            IOError 9 - Raised if the file cannot read from to.
+            IOError 9 - Raised if the file cannot read from.
             EOFError - An attempt is made to read past the end of the
                        file.
 
@@ -391,7 +471,7 @@ class BitFile:
 
         self._verify_opened()
 
-        if 'r' not in self._mode:
+        if not self._is_readable():
             raise IOError(errno.EBADF, 'Bad file descriptor')
 
         return_value = self._stream.read(1)
@@ -401,16 +481,16 @@ class BitFile:
         else:
             return_value = ord(return_value)
 
-        if self._bit_count == 0:
+        if self._input_buffer[0] == 0:
             # We can just get the byte the from file.
             return chr(return_value)
 
         # We have some buffered bits to return too.
-        tmp = return_value >> self._bit_count
-        tmp = tmp | self._bit_buffer << (8 - self._bit_count)
+        tmp = return_value >> self._input_buffer[0]
+        tmp = tmp | self._input_buffer[1] << (8 - self._input_buffer[0])
 
         # Put remaining bits in buffer.  Count shouldn't change.
-        self._bit_buffer = return_value & 0xFF
+        self._input_buffer[1] = return_value & 0xFF
         return_value = tmp & 0xFF
 
         return chr(return_value)
@@ -430,7 +510,7 @@ class BitFile:
 
         Side Effects:
             One byte is written to the output stream.
-            _bit_buffer and _bit_count are updated appropriately.
+            _output_buffer is updated appropriately.
 
         Exceptions Raised:
             ValueError - Raised if the stream is not opened.
@@ -440,10 +520,10 @@ class BitFile:
 
         self._verify_opened()
 
-        if 'w' not in self._mode and 'a' not in self._mode:
+        if not self._is_writable():
             raise IOError(errno.EBADF, 'Bad file descriptor')
 
-        if self._bit_count == 0:
+        if self._output_buffer[0] == 0:
             # We can just get the byte the from file.
             if not isinstance(c, basestring):
                 c = chr(c)      # Make c a char for writing
@@ -456,13 +536,13 @@ class BitFile:
             c = ord(c[0])       # Make sure we have a byte value.
 
         c = c & 0xFF
-        tmp = c >> self._bit_count
-        tmp = tmp | self._bit_buffer << (8 - self._bit_count)
+        tmp = c >> self._output_buffer[0]
+        tmp = tmp | self._output_buffer[1] << (8 - self._output_buffer[0])
         tmp = tmp & 0xFF
         self._stream.write(chr(tmp))
 
         # Put remaining in buffer. count shouldn't change.
-        self._bit_buffer = c
+        self._output_buffer[1] = c
 
         return chr(c)
 
@@ -480,11 +560,11 @@ class BitFile:
         Side Effects:
             One byte is read from the input stream if the bit buffer is
             currently empty.
-            _bit_buffer and _bit_count are updated appropriately.
+            _input_buffer is updated appropriately.
 
         Exceptions Raised:
             ValueError - Raised if the stream is not opened.
-            IOError 9 - Raised if the file cannot read from to.
+            IOError 9 - Raised if the file cannot read from.
             EOFError - An attempt is made to read past the end of the
                        file.
 
@@ -492,23 +572,23 @@ class BitFile:
 
         self._verify_opened()
 
-        if 'r' not in self._mode:
+        if not self._is_readable():
             raise IOError(errno.EBADF, 'Bad file descriptor')
 
-        if self._bit_count == 0:
+        if self._input_buffer[0] == 0:
             # The buffer is empty, read another character.
-            self._bit_buffer = self._stream.read(1)
+            self._input_buffer[1] = self._stream.read(1)
 
-            if self._bit_buffer == '':
+            if self._input_buffer[1] == '':
                 raise EOFError
             else:
-                self._bit_buffer = ord(self._bit_buffer)
+                self._input_buffer[1] = ord(self._input_buffer[1])
 
-            self._bit_count = 8
+            self._input_buffer[0] = 8
 
         # The bit to return is msb in buffer.
-        self._bit_count = self._bit_count - 1
-        return_value = self._bit_buffer >> self._bit_count
+        self._input_buffer[0] = self._input_buffer[0] - 1
+        return_value = self._input_buffer[1] >> self._input_buffer[0]
 
         return return_value & 0x01
 
@@ -526,7 +606,7 @@ class BitFile:
 
         Side Effects:
             One byte may be written to the output stream.
-            _bit_buffer and _bit_count are updated appropriately.
+            _output_buffer is updated appropriately.
 
         Exceptions Raised:
             ValueError - Raised if the stream is not opened.
@@ -536,23 +616,22 @@ class BitFile:
 
         self._verify_opened()
 
-        if 'w' not in self._mode and 'a' not in self._mode:
+        if not self._is_writable():
             raise IOError(errno.EBADF, 'Bad file descriptor')
 
-        self._bit_count = self._bit_count + 1
-        self._bit_buffer = (self._bit_buffer << 1) & 0xFF
+        self._output_buffer[0] = self._output_buffer[0] + 1
+        self._output_buffer[1] = (self._output_buffer[1] << 1) & 0xFF
 
         if bit:
-            self._bit_buffer |= 1
+            self._output_buffer[1] |= 1
             bit = 1
         else:
             bit = 0
 
         # Write bit the buffer if we have 8 bits.
-        if self._bit_count == 8:
-            self._stream.write(chr(self._bit_buffer))
-            self._bit_buffer = 0
-            self._bit_count = 0
+        if self._output_buffer[0] == 8:
+            self._stream.write(chr(self._output_buffer[1]))
+            self._output_buffer = [0, 0]
 
         return bit
 
@@ -575,11 +654,11 @@ class BitFile:
         Side Effects:
             The specified number of bits will be read from the input
             stream and/or bit buffer.
-            _bit_buffer and _bit_count are updated appropriately.
+            _input_buffer is updated appropriately.
 
         Exceptions Raised:
             ValueError - Raised if the stream is not opened.
-            IOError 9 - Raised if the file cannot read from to.
+            IOError 9 - Raised if the file cannot read from.
             EOFError - An attempt is made to read past the end of the
                        file.
 
@@ -587,7 +666,7 @@ class BitFile:
 
         self._verify_opened()
 
-        if 'r' not in self._mode:
+        if not self._is_readable():
             raise IOError(errno.EBADF, 'Bad file descriptor')
 
         remaining = count
@@ -638,7 +717,7 @@ class BitFile:
         Side Effects:
             The specified number of bits will be written to the output
             stream and/or bit buffer.
-            _bit_buffer and _bit_count are updated appropriately.
+            _output_buffer is updated appropriately.
 
         Exceptions Raised:
             ValueError - Raised if the stream is not opened.
@@ -648,7 +727,7 @@ class BitFile:
 
         self._verify_opened()
 
-        if 'w' not in self._mode and 'a' not in self._mode:
+        if not self._is_writable():
             raise IOError(errno.EBADF, 'Bad file descriptor')
 
         remaining = count
@@ -694,11 +773,11 @@ class BitFile:
         Side Effects:
             The specified number of bits will be read from the input
             stream and/or bit buffer.
-            _bit_buffer and _bit_count are updated appropriately.
+            _input_buffer is updated appropriately.
 
         Exceptions Raised:
             ValueError - Raised if the stream is not opened.
-            IOError 9 - Raised if the file cannot read from to.
+            IOError 9 - Raised if the file cannot read from.
             EOFError - An attempt is made to read past the end of the
                        file.
 
@@ -706,7 +785,7 @@ class BitFile:
 
         self._verify_opened()
 
-        if 'r' not in self._mode:
+        if not self._is_readable():
             raise IOError(errno.EBADF, 'Bad file descriptor')
 
         remaining = count
@@ -755,7 +834,7 @@ class BitFile:
         Side Effects:
             The specified number of bits will be written to the output
             stream and/or bit buffer.
-            _bit_buffer and _bit_count are updated appropriately.
+            _output_buffer is updated appropriately.
 
         Exceptions Raised:
             ValueError - Raised if the stream is not opened.
@@ -765,7 +844,7 @@ class BitFile:
 
         self._verify_opened()
 
-        if 'w' not in self._mode and 'a' not in self._mode:
+        if not self._is_writable():
             raise IOError(errno.EBADF, 'Bad file descriptor')
 
         remaining = count

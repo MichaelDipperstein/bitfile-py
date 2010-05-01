@@ -21,4 +21,4 @@ from bitfile import BitFile
 
 __author__ = "Michael Dipperstein <mdipper@alumni.engr.ucsb.edu>"
 __license__ = "GPL"
-__version__ = "0.1"
+__version__ = "0.2"

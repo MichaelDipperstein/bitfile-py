@@ -35,10 +35,10 @@ python sample.py -v
 HISTORY
 -------
 01/14/10 - Initial release
+03/04/10 - Add support for 'r+' (read/write) mode
 
 TODO
 ----
-- Add/Verify support for 'rw' mode.
 - Add constructor to convert a standard file into a BitFile.
 
 AUTHOR

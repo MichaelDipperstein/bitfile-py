@@ -42,6 +42,42 @@ Reading 12 bits MS byte to LS byte:
      0x333
      0x444
      0x555
+Writing characters:
+     A B C D E
+Writing bits:
+     1 0 1 0 1
+Writing characters:
+     F G H I J
+Writing 96 bits MS byte to LS byte:
+     0x11111111
+     0x22222222
+     0x33333333
+     0x44444444
+     0x55555555
+Writing 12 bits LS byte to MS byte:
+     0x111
+     0x222
+     0x333
+     0x444
+     0x555
+Reading characters:
+     A B C D E
+Reading bits:
+     1 0 1 0 1
+Reading characters:
+     F G H I J
+Reading 96 bits MS byte to LS byte:
+     0x11111111
+     0x22222222
+     0x33333333
+     0x44444444
+     0x55555555
+Reading 12 bits MS byte to LS byte:
+     0x111
+     0x222
+     0x333
+     0x444
+     0x555
 """
 
 import sys
@@ -54,7 +90,30 @@ def example(num_calls):
 
     # Open bit file for writing.
     bf.open('testfile', 'w')
+    write_test(bf, num_calls)
+    bf.close()
 
+    # Now read back writes
+
+    # Open bit file for reading.
+    bf.open('testfile', 'r')
+    read_test(bf, num_calls)
+
+    bf.close()
+
+    # Open bit file for reading and writing.
+    bf.open('testfile', 'r+')
+    write_test(bf, num_calls)
+
+    # Now read back writes
+
+    # Go back to the beginning of the file (it was opened with r+).
+    bf.seek(0)
+    read_test(bf, num_calls)
+
+    bf.close()
+
+def write_test(bf, num_calls):
     # Write chars
     value = 'A'
     print 'Writing characters:\n    ',
@@ -98,13 +157,10 @@ def example(num_calls):
         bf.put_bits_ltom(value, 12)
         value = value + 0x111
 
-    bf.close()
+    # Write out any remaining bits.
+    bf.flush()
 
-    # Now read back writes
-
-    # Open bit file for reading.
-    bf.open('testfile', 'r')
-
+def read_test(bf, num_calls):
     # Read chars
     print 'Reading characters:\n    ',
     expected = 'A'
@@ -183,8 +239,6 @@ def example(num_calls):
         else:
             print '    ', hex(value)
         expected = expected + 0x111
-
-    bf.close()
 
 if __name__ == "__main__":
     import doctest
