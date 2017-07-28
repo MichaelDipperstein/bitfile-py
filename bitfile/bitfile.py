@@ -58,7 +58,7 @@ def str_to_int(str):
     """
 
     bin_val = 0
-    for i in xrange(len(str)):
+    for i in range(len(str)):
         bin_val = (bin_val << 8) + ord(str[i])
     return bin_val
 
@@ -86,11 +86,18 @@ def int_to_str(value, length):
     """
 
     val_str = ''
-    for i in xrange(length):
+    for i in range(length):
         val_str = chr(value & 0xFF) + val_str
         value = value >> 8
     return val_str
 
+def is_str(data):
+    try:
+        basestring
+    except NameError:
+        basestring = (str, bytes)
+
+    return isinstance(data, basestring)
 
 class BitFile:
 
@@ -140,8 +147,8 @@ class BitFile:
             Data elements are initialized as follows:
             _stream = None
             _mode = ''
-            _input_buffer = [0, 0]
-            _output_buffer = [0, 0]
+            _input_buffer = bytearray(b'\x00\x00')
+            _output_buffer = bytearray(b'\x00\x00')
 
         Exceptions Raised:
             None.
@@ -152,8 +159,8 @@ class BitFile:
         self._mode = ''
 
         # buffers are in the format [bit_count, buffered_bits]
-        self._input_buffer = [0, 0]
-        self._output_buffer = [0, 0]
+        self._input_buffer = bytearray(2)
+        self._output_buffer = bytearray(2)
         return
 
     def __del__(self):
@@ -290,8 +297,8 @@ class BitFile:
             # open function will throw exception for other invalid modes.
             self._stream = open(file_name, mode)
             self._mode = mode
-            self._input_buffer = [0, 0]
-            self._output_buffer = [0, 0]
+            self._input_buffer = bytearray(2)
+            self._output_buffer = bytearray(2)
         else:
             raise ValueError('I/O operation on opened file.')
         return
@@ -329,8 +336,8 @@ class BitFile:
         self._stream.close()
         self._stream = None
         self._mode = ''
-        self._input_buffer = [0, 0]
-        self._output_buffer = [0, 0]
+        self._input_buffer = bytearray(2)
+        self._output_buffer = bytearray(2)
         return
 
     def byte_align(self):
@@ -365,8 +372,8 @@ class BitFile:
             bits = self._output_buffer[1] << (8 - self._output_buffer[0])
             self._stream.write(chr(bits))
 
-        self._input_buffer = [0, 0]
-        self._output_buffer = [0, 0]
+        self._input_buffer = bytearray(2)
+        self._output_buffer = bytearray(2)
         return return_value
 
     def seek(self, offset, whence=0):
@@ -434,15 +441,16 @@ class BitFile:
 
         # There must be unwritten bits.  Write them out.
         return_value = self._output_buffer[0]
-        bits = self._output_buffer[1] << (8 - self._output_buffer[0])
-        bits = bits & 0xFF
+        bits = bytearray(1)
+        bits[0] = (self._output_buffer[1] <<
+            (8 - self._output_buffer[0])) & 0xFF
 
         if ones_fill:
-            bits = bits | (0xFF >> self._output_buffer[0])
+            bits[0] |= (0xFF >> self._output_buffer[0])
 
-        self._stream.write(chr(bits))
+        self._stream.write(bits)
         self._stream.flush()
-        self._output_buffer = [0, 0]
+        self._output_buffer = bytearray(2)
 
         return return_value
 
@@ -524,22 +532,25 @@ class BitFile:
             raise IOError(errno.EBADF, 'Bad file descriptor')
 
         if self._output_buffer[0] == 0:
-            # We can just get the byte the from file.
-            if not isinstance(c, basestring):
-                c = chr(c)      # Make c a char for writing
-            else:
-                c = c[0]        # Use first chr if c is more than 1 char.
-            self._stream.write(c)
-            return c
+            # We can just put the byte to the file.
+            if not is_str(c):
+                c = str(chr(c))
 
-        if isinstance(c, basestring):
+            c = bytearray(c[0], 'utf-8')
+            self._stream.write(c)
+            return c[0]
+
+        if is_str(c):
             c = ord(c[0])       # Make sure we have a byte value.
 
         c = c & 0xFF
-        tmp = c >> self._output_buffer[0]
-        tmp = tmp | self._output_buffer[1] << (8 - self._output_buffer[0])
-        tmp = tmp & 0xFF
-        self._stream.write(chr(tmp))
+
+        tmp = bytearray(1)
+        tmp[0] = c >> self._output_buffer[0]
+        tmp[0] |= (self._output_buffer[1] <<
+            (8 - self._output_buffer[0])) & 0xFF
+
+        self._stream.write(tmp)
 
         # Put remaining in buffer. count shouldn't change.
         self._output_buffer[1] = c
@@ -577,12 +588,12 @@ class BitFile:
 
         if self._input_buffer[0] == 0:
             # The buffer is empty, read another character.
-            self._input_buffer[1] = self._stream.read(1)
+            c = self._stream.read(1)
 
-            if self._input_buffer[1] == '':
+            if c == '':
                 raise EOFError
             else:
-                self._input_buffer[1] = ord(self._input_buffer[1])
+                self._input_buffer[1] = ord(c)
 
             self._input_buffer[0] = 8
 
@@ -630,129 +641,12 @@ class BitFile:
 
         # Write bit the buffer if we have 8 bits.
         if self._output_buffer[0] == 8:
-            self._stream.write(chr(self._output_buffer[1]))
-            self._output_buffer = [0, 0]
+            tmp = bytearray(1)
+            tmp[0] = self._output_buffer[1]
+            self._stream.write(tmp)
+            self._output_buffer = bytearray(2)
 
         return bit
-
-    def get_bits_mtol(self, count):
-        """Read bits from an input stream MSByte to LSByte.
-
-        This method reads the specified number of bits from the input
-        stream.  The bits are returned in an integer, filling it MSByte
-        to LSByte.
-
-        Arguments:
-            count - the number of bits to be read.
-
-        Return Value(s):
-            An integer object containing the bits form an open input
-            stream.  The bits are stored in the integer MSByte to
-            LSByte.  If an integral number of bytes are not read, the
-            bits in the last byte will be left justified (msbits).
-
-        Side Effects:
-            The specified number of bits will be read from the input
-            stream and/or bit buffer.
-            _input_buffer is updated appropriately.
-
-        Exceptions Raised:
-            ValueError - Raised if the stream is not opened.
-            IOError 9 - Raised if the file cannot read from.
-            EOFError - An attempt is made to read past the end of the
-                       file.
-
-        """
-
-        self._verify_opened()
-
-        if not self._is_readable():
-            raise IOError(errno.EBADF, 'Bad file descriptor')
-
-        remaining = count
-        as_str = ''
-
-        # Read whole bytes.
-        while remaining >= 8:
-            return_value = self.get_char()
-            as_str = as_str + return_value
-            remaining = remaining - 8
-
-        if remaining != 0:
-            # Read all remaining bits.
-            last = 0
-            shifts = 8 - remaining
-
-            while remaining > 0:
-                return_value = self.get_bit()
-                last = last << 1
-                last = last | (return_value & 0x01)
-                remaining = remaining - 1
-
-            # Shift the final bits into position and add to str
-            last = (last << shifts) & 0xFF
-            as_str = as_str + chr(last)
-
-        # Make integer out of as_str.
-        return_value = str_to_int(as_str)
-        return return_value
-
-    def put_bits_mtol(self, bits, count):
-        """Write bits to an output stream MSByte to LSByte.
-
-        This method writes the specified number of bits to the output
-        stream.  Bits are read from an integer object containing the
-        bits MSByte to LSByte.  The bytes are copied to the open output
-        stream in the order that they are read.  If an integral number
-        of bytes are not specified, the ms bits in the last byte will be
-        written.
-
-        Arguments:
-            bits - an object containing the bits to be written.
-            count - the number of bits to be written.
-
-        Return Value(s):
-            The number of bits written.
-
-        Side Effects:
-            The specified number of bits will be written to the output
-            stream and/or bit buffer.
-            _output_buffer is updated appropriately.
-
-        Exceptions Raised:
-            ValueError - Raised if the stream is not opened.
-            IOError 9 - Raised if the file cannot written to.
-
-        """
-
-        self._verify_opened()
-
-        if not self._is_writable():
-            raise IOError(errno.EBADF, 'Bad file descriptor')
-
-        remaining = count
-
-        if not isinstance(bits, basestring):
-            as_str = int_to_str(bits, (count + 7) / 8)
-        else:
-            as_str = bits
-
-        # Write whole bytes.
-        while remaining >= 8:
-            return_value = self.put_char(as_str[0])
-            remaining -= 8
-            as_str = as_str[1:]
-
-        if remaining != 0:
-            # Write the remaining bits.
-            tmp = ord(as_str)
-
-            while remaining > 0:
-                self.put_bit(tmp & 0x80)
-                tmp = (tmp << 1) & 0xFF
-                remaining = remaining - 1
-
-        return count
 
     def get_bits_ltom(self, count):
         """Read bits from an input stream LSByte to MSByte.
@@ -849,8 +743,8 @@ class BitFile:
 
         remaining = count
 
-        if not isinstance(bits, basestring):
-            as_str = int_to_str(bits, (count + 7) / 8)
+        if not is_str(bits):
+            as_str = int_to_str(bits, (count + 7) // 8)
         else:
             as_str = bits
 
