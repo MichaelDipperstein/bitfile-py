@@ -5,55 +5,59 @@ provide sample usages for the methods in the BitFile class.
 Here's a doctest that verifies the BitFile class.  To see the full
 output use the command "python sample.py -v":
 
->>> example(5)
+>>> example(6)
 Writing characters:
-     ABCDE
+     ABCDEF
 Writing bits:
-     10101
-Writing characters:
-     FGHIJ
+     101010
 Writing 12 bits LS byte to MS byte:
      0x111
      0x222
      0x333
      0x444
      0x555
+     0x666
+Writing bits:
+     101010
 Reading characters:
-     ABCDE
+     ABCDEF
 Reading bits:
-     10101
-Reading characters:
-     FGHIJ
+     101010
 Reading 12 bits MS byte to LS byte:
      0x111
      0x222
      0x333
      0x444
      0x555
+     0x666
+Reading bits:
+     101010
 Writing characters:
-     ABCDE
+     ABCDEF
 Writing bits:
-     10101
-Writing characters:
-     FGHIJ
+     101010
 Writing 12 bits LS byte to MS byte:
      0x111
      0x222
      0x333
      0x444
      0x555
+     0x666
+Writing bits:
+     101010
 Reading characters:
-     ABCDE
+     ABCDEF
 Reading bits:
-     10101
-Reading characters:
-     FGHIJ
+     101010
 Reading 12 bits MS byte to LS byte:
      0x111
      0x222
      0x333
      0x444
      0x555
+     0x666
+Reading bits:
+     101010
 """
 
 from __future__ import print_function
@@ -61,7 +65,7 @@ import sys
 import os
 import bitfile
 
-NUM_CALLS = 5
+NUM_CALLS = 6
 
 def example(num_calls):
     bf = bitfile.BitFile()
@@ -111,15 +115,6 @@ def write_test(bf, num_calls):
         value = 1 - value
     print('')
 
-    # Write chars
-    value = chr(ord('A') + num_calls)
-    print('Writing characters:\n     ', end='')
-    for i in range(num_calls):
-        print(value, end='')
-        bf.put_char(value)
-        value = chr(ord(value) + 1)
-    print('')
-
     # Write some bits from an integer (LSByte to MSByte).
     value = 0x111
     print('Writing 12 bits LS byte to MS byte:')
@@ -127,6 +122,15 @@ def write_test(bf, num_calls):
         print('    ', hex(value))
         bf.put_bits(value, 12)
         value = value + 0x111
+
+    # Write single bits
+    value = 1
+    print('Writing bits:\n     ', end='')
+    for i in range(num_calls):
+        print(value, end='')
+        bf.put_bit(value)
+        value = 1 - value
+    print('')
 
     # Write out any remaining bits.
     bf.flush()
@@ -162,23 +166,6 @@ def read_test(bf, num_calls):
             print(value, end='')
     print('')
 
-    # Read chars
-    expected = chr(ord('A') + num_calls)
-    print('Reading characters:\n     ', end='')
-    for i in range(num_calls):
-        try:
-            value = bf.get_char()
-            if value != expected:
-                print('\nError: Got:', value, 'Expected:', expected, '\n')
-        except:
-            print('Error: reading char')
-            bf.close()
-            exit()
-        else:
-            print(value, end='')
-        expected = chr(ord(expected) + 1)
-    print('')
-
     # Read some bits into an integer (LSByte to MSByte).
     expected = 0x111
     print('Reading 12 bits MS byte to LS byte:')
@@ -194,6 +181,19 @@ def read_test(bf, num_calls):
         else:
             print('    ', hex(value))
         expected = expected + 0x111
+
+    # Read single bits
+    print('Reading bits:\n     ', end='')
+    for i in range(num_calls):
+        try:
+            value = bf.get_bit()
+        except:
+            print('Error: reading bits')
+            bf.close()
+            exit()
+        else:
+            print(value, end='')
+    print('')
 
 if __name__ == "__main__":
     import doctest
