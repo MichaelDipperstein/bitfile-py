@@ -36,6 +36,7 @@ HISTORY
 -------
 01/14/10 - Initial release
 03/04/10 - Add support for 'r+' (read/write) mode
+07/30/17 - Add support for python 3.x
 
 TODO
 ----
