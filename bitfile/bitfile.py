@@ -648,7 +648,7 @@ class BitFile:
 
         return bit
 
-    def get_bits_ltom(self, count):
+    def get_bits(self, count):
         """Read bits from an input stream LSByte to MSByte.
 
         This method reads the specified number of bits from the input
@@ -708,7 +708,7 @@ class BitFile:
         return_value = str_to_int(as_str)
         return return_value
 
-    def put_bits_ltom(self, bits, count):
+    def put_bits(self, bits, count):
         """Write bits to an output stream LSByte to MSByte.
 
         This method writes the specified number of bits to the output

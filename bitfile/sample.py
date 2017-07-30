@@ -58,6 +58,7 @@ Reading 12 bits MS byte to LS byte:
 
 from __future__ import print_function
 import sys
+import os
 import bitfile
 
 NUM_CALLS = 5
@@ -89,6 +90,7 @@ def example(num_calls):
     read_test(bf, num_calls)
 
     bf.close()
+    os.remove('testfile')
 
 def write_test(bf, num_calls):
     # Write chars
@@ -123,7 +125,7 @@ def write_test(bf, num_calls):
     print('Writing 12 bits LS byte to MS byte:')
     for i in range(num_calls):
         print('    ', hex(value))
-        bf.put_bits_ltom(value, 12)
+        bf.put_bits(value, 12)
         value = value + 0x111
 
     # Write out any remaining bits.
@@ -182,7 +184,7 @@ def read_test(bf, num_calls):
     print('Reading 12 bits MS byte to LS byte:')
     for i in range(num_calls):
         try:
-            value = bf.get_bits_ltom(12)
+            value = bf.get_bits(12)
             if value != expected:
                 print('\nError: Got:', value, 'Expected:', expected, '\n')
         except:
