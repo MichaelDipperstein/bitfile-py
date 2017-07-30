@@ -34,48 +34,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import errno
 
-
-def str_to_int(str):
-    """Convert a str type variable to an int using ord of characters.
-
-    This is a helper function that accepts a python string and converts
-    it to an integer where ord(str[0]) is the MSB of the integer and
-    ord(str[-1]) is the LSB of the integer.
-
-    Arguments:
-        str - The python string to be converted to an integer.
-
-    Return Value(s):
-        An integer where ord(str[0]) is the MSB of the integer and
-        ord(str[-1]) is the LSB of the integer.
-
-    Side Effects:
-        None.
-
-    Exceptions Raised:
-        None.
-
-    """
-
-    bin_val = 0
-    for i in range(len(str)):
-        bin_val = (bin_val << 8) + ord(str[i])
-    return bin_val
-
-
-def int_to_str(value, length):
-    """Convert an int type variable to a str using chr of bytes.
+def int_to_bytearray(value, length):
+    """Convert an int type variable to a bytearray.
 
     This is a helper function that accepts a python integer and converts
-    it to a string where chr(MSB) is str[0] and chr(LSB) is str[-1]
+    the MSB is index 0 in the bytearray and the LSB is index -1 in the
+    bytearray
 
     Arguments:
         value - The python integer to be converted to a string.
         length - The number of bytes in the integer to be converted.
 
     Return Value(s):
-        A string representation of an integer where ord(str[0]) is the
-        MSB of the integer and ord(str[-1]) is the LSB of the integer.
+        A bytearray representation of an integer where index 0 is the
+        MSB of the integer and index -1 is the LSB of the integer.
 
     Side Effects:
         None.
@@ -85,19 +57,11 @@ def int_to_str(value, length):
 
     """
 
-    val_str = ''
+    ba = bytearray(length)
     for i in range(length):
-        val_str = chr(value & 0xFF) + val_str
+        ba[length - i -1] = value & 0xFF
         value = value >> 8
-    return val_str
-
-def is_str(data):
-    try:
-        basestring
-    except NameError:
-        basestring = (str, bytes)
-
-    return isinstance(data, basestring)
+    return ba
 
 class BitFile:
 
@@ -531,19 +495,16 @@ class BitFile:
         if not self._is_writable():
             raise IOError(errno.EBADF, 'Bad file descriptor')
 
+        if not isinstance(c, str):
+            c = str(chr(c & 0xFF))
+
         if self._output_buffer[0] == 0:
             # We can just put the byte to the file.
-            if not is_str(c):
-                c = str(chr(c))
-
             c = bytearray(c[0], 'utf-8')
             self._stream.write(c)
             return c[0]
 
-        if is_str(c):
-            c = ord(c[0])       # Make sure we have a byte value.
-
-        c = c & 0xFF
+        c = ord(c[0])       # Make sure we have a byte value.
 
         tmp = bytearray(1)
         tmp[0] = c >> self._output_buffer[0]
@@ -683,12 +644,11 @@ class BitFile:
             raise IOError(errno.EBADF, 'Bad file descriptor')
 
         remaining = count
-        as_str = ''
+        values = []
 
         # Read whole bytes.
         while remaining >= 8:
-            return_value = self.get_char()
-            as_str = return_value + as_str
+            values.insert(0, ord(self.get_char()))
             remaining = remaining - 8
 
         if remaining != 0:
@@ -696,16 +656,18 @@ class BitFile:
             last = 0
 
             while remaining > 0:
-                return_value = self.get_bit()
                 last = last << 1
-                if return_value:
+                if self.get_bit():
                     last = last | 0x01
                 remaining = remaining - 1
 
-            as_str = chr(last) + as_str
+            values.insert(0, last)
 
-        # Make integer out of as_str.
-        return_value = str_to_int(as_str)
+        return_value = 0
+
+        for v in values:
+            return_value = (return_value << 8) + v
+
         return return_value
 
     def put_bits(self, bits, count):
@@ -733,6 +695,7 @@ class BitFile:
         Exceptions Raised:
             ValueError - Raised if the stream is not opened.
             IOError 9 - Raised if the file cannot written to.
+            TypeError - Raised if bits is not an integer object
 
         """
 
@@ -741,22 +704,21 @@ class BitFile:
         if not self._is_writable():
             raise IOError(errno.EBADF, 'Bad file descriptor')
 
+        if not isinstance(bits, int):
+            raise TypeError('Bits must be in integer type')
+
         remaining = count
 
-        if not is_str(bits):
-            as_str = int_to_str(bits, (count + 7) // 8)
-        else:
-            as_str = bits
+        ba = int_to_bytearray(bits, (count + 7) // 8)
 
         # Write whole bytes.
         while remaining >= 8:
-            return_value = self.put_char(as_str[-1])
+            return_value = self.put_char(ba.pop())
             remaining -= 8
-            as_str = as_str[0:-1]
 
         if remaining != 0:
             # Write the remaining bits.
-            tmp = ord(as_str[0])
+            tmp = ba[0]
             tmp = tmp << (8 - remaining)
             while remaining > 0:
                 self.put_bit(tmp & 0x80)
