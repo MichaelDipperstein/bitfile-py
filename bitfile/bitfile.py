@@ -498,25 +498,25 @@ class BitFile:
         if not isinstance(c, str):
             c = str(chr(c & 0xFF))
 
+        ba = bytearray(1)
+        ba[0] = ord(c[0])
+
         if self._output_buffer[0] == 0:
             # We can just put the byte to the file.
-            c = bytearray(c[0], 'utf-8')
-            self._stream.write(c)
-            return c[0]
-
-        c = ord(c[0])       # Make sure we have a byte value.
+            self._stream.write(ba)
+            return chr(ba[0])
 
         tmp = bytearray(1)
-        tmp[0] = c >> self._output_buffer[0]
+        tmp[0] = ba[0] >> self._output_buffer[0]
         tmp[0] |= (self._output_buffer[1] <<
             (8 - self._output_buffer[0])) & 0xFF
 
         self._stream.write(tmp)
 
         # Put remaining in buffer. count shouldn't change.
-        self._output_buffer[1] = c
+        self._output_buffer[1] = ba[0]
 
-        return chr(c)
+        return chr(ba[0])
 
     def get_bit(self):
         """Read the next bit from an input stream.
