@@ -67,6 +67,7 @@ import bitfile
 
 NUM_CALLS = 6
 
+
 def example(num_calls):
     bf = bitfile.BitFile()
 
@@ -95,6 +96,7 @@ def example(num_calls):
 
     bf.close()
     os.remove('testfile')
+
 
 def write_test(bf, num_calls):
     # Write chars
@@ -134,6 +136,7 @@ def write_test(bf, num_calls):
 
     # Write out any remaining bits.
     bf.flush()
+
 
 def read_test(bf, num_calls):
     # Read chars

@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import errno
 
+
 def int_to_bytearray(value, length):
     """Convert an int type variable to a bytearray.
 
@@ -59,9 +60,10 @@ def int_to_bytearray(value, length):
 
     ba = bytearray(length)
     for i in range(length):
-        ba[length - i -1] = value & 0xFF
+        ba[length - i - 1] = value & 0xFF
         value = value >> 8
     return ba
+
 
 class BitFile:
 
@@ -220,8 +222,8 @@ class BitFile:
 
         """
 
-        if self._stream is not None and\
-            any(['w' in self._mode, 'a' in self._mode, '+' in self._mode]):
+        if self._stream is not None and \
+                any(['w' in self._mode, 'a' in self._mode, '+' in self._mode]):
             return True
         else:
             return False
@@ -406,8 +408,8 @@ class BitFile:
         # There must be unwritten bits.  Write them out.
         return_value = self._output_buffer[0]
         bits = bytearray(1)
-        bits[0] = (self._output_buffer[1] <<
-            (8 - self._output_buffer[0])) & 0xFF
+        bits[0] = (
+            self._output_buffer[1] << (8 - self._output_buffer[0])) & 0xFF
 
         if ones_fill:
             bits[0] |= (0xFF >> self._output_buffer[0])
@@ -508,8 +510,8 @@ class BitFile:
 
         tmp = bytearray(1)
         tmp[0] = ba[0] >> self._output_buffer[0]
-        tmp[0] |= (self._output_buffer[1] <<
-            (8 - self._output_buffer[0])) & 0xFF
+        tmp[0] |= (
+            self._output_buffer[1] << (8 - self._output_buffer[0])) & 0xFF
 
         self._stream.write(tmp)
 

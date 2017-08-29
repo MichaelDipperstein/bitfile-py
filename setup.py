@@ -16,17 +16,20 @@ __classifiers__ = [
     'Topic :: Utilities',
 ]
 
-setup(name='bitfile',
-      version='0.3',
-      description=\
-        'Module for reading/writing an arbitrary number of bits from a file.',
-      author='Michael Dipperstein',
-      author_email='mdipper@alumni.engr.ucsb.edu',
-      license='GPL',
-      url='https://michaeldipperstein.github.io/bitfile.html',
-      packages=['bitfile',],
-      package_data={'bitfile': ['COPYING', 'README']},
-      platforms='All platforms',
-      long_description=__desc__,
-      classifiers=__classifiers__,
-     )
+module_description = \
+    'Module for reading/writing an arbitrary number of bits from a file.'
+
+setup(
+    name='bitfile',
+    version='0.3',
+    description=module_description,
+    author='Michael Dipperstein',
+    author_email='mdipper@alumni.engr.ucsb.edu',
+    license='GPL',
+    url='https://michaeldipperstein.github.io/bitfile.html',
+    packages=['bitfile', ],
+    package_data={'bitfile': ['COPYING', 'README']},
+    platforms='All platforms',
+    long_description=__desc__,
+    classifiers=__classifiers__,
+)
