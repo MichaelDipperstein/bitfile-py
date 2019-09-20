@@ -1,7 +1,7 @@
 """
 bitfile: A python I/O class for files containing arbitrary data sizes.
 Copyright (C) 2010
-      Michael Dipperstein (mdipper@alumni.engr.ucsb.edu)
+      Michael Dipperstein (mdipperstein@gmail.com)
 
 Bitfile is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the
@@ -19,6 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from bitfile import BitFile
 
-__author__ = "Michael Dipperstein <mdipper@alumni.engr.ucsb.edu>"
+__author__ = "Michael Dipperstein <mdipperstein@gmail.com>"
 __license__ = "GPL"
 __version__ = "0.2"

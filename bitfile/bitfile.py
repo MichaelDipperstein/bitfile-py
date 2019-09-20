@@ -14,7 +14,7 @@
 
 bitfile: A python I/O class for files containing arbitrary data sizes.
 Copyright (C) 2010
-      Michael Dipperstein (mdipper@alumni.engr.ucsb.edu)
+      Michael Dipperstein (mdipperstein@gmail.com)
 
 This file implements bitfile.
 
